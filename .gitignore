@@ -5,6 +5,10 @@ config*.json
 *.sqlite-wal
 logfile.txt
 user_data/*
+!user_data/strategies/
+user_data/strategies/*
+!user_data/strategies/BTCSwing_*.py
+!user_data/strategies/risk_management.py
 !user_data/strategy/sample_strategy.py
 !user_data/notebooks
 !user_data/models
