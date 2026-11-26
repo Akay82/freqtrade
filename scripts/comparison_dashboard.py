@@ -18,10 +18,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 try:
     from scripts.fleet_risk import read_state, recent_alerts
+    from scripts.engine.api_router import engine_router
 except ModuleNotFoundError:
     from fleet_risk import read_state, recent_alerts
+    from engine.api_router import engine_router
 
 app = FastAPI(title="BTC 10-Strategy Swing Fleet Dashboard")
+app.include_router(engine_router)
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RECORD_DIR = os.path.join(PROJECT_ROOT, "user_data", "records")
@@ -445,6 +448,16 @@ def index_page():
             </div>
         </header>
 
+        <!-- Navigation Tabs (Section 18) -->
+        <nav class="flex flex-wrap gap-2 border-b border-gray-800 pb-3">
+            <button onclick="switchTab('fleet')" id="btn-tab-fleet" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">10-Bot Fleet</button>
+            <button onclick="switchTab('market')" id="btn-tab-market" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700">Market &amp; Signals</button>
+            <button onclick="switchTab('risk')" id="btn-tab-risk" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700">Risk Monitor</button>
+            <button onclick="switchTab('backtest')" id="btn-tab-backtest" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700">Backtesting</button>
+            <button onclick="switchTab('ml')" id="btn-tab-ml" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700">ML &amp; Attribution</button>
+        </nav>
+
+        <div id="tab-fleet" class="space-y-6">
         <div id="riskStatus" class="text-sm text-gray-300 px-1">Risk guard: loading test status…</div>
         <div class="text-xs text-amber-300 px-1">All 10 strategies trade BTC/USDT. This is a rules comparison, not diversification; their returns can be highly correlated.</div>
         <div id="alertBanner" class="hidden rounded-lg border px-4 py-3 text-sm" role="alert"></div>
@@ -536,6 +549,89 @@ def index_page():
             </h3>
             <div id="chartBars" class="space-y-3">
                 <!-- Populated by JS -->
+            </div>
+        </div>
+        </div><!-- end tab-fleet -->
+
+        <!-- Tab 2: Market Overview & Signal Analysis (Sections 18A, 18B, 18C) -->
+        <div id="tab-market" class="hidden space-y-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="marketKpis">
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="text-gray-400 text-xs mb-1">BTC/USDT Spot Price</div>
+                    <div id="engPrice" class="text-2xl font-bold text-white">--</div>
+                    <div id="engChange24h" class="text-xs text-gray-400 mt-1">--</div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="text-gray-400 text-xs mb-1">Market Regime (4H)</div>
+                    <div id="engRegime" class="text-xl font-bold text-yellow-400">--</div>
+                    <div id="engRegimeConf" class="text-xs text-gray-400 mt-1">Confidence: --</div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="text-gray-400 text-xs mb-1">MTF Alignment (1D / 4H / 1H)</div>
+                    <div id="engMtfBias" class="text-lg font-bold text-white">--</div>
+                    <div id="engMtfScore" class="text-xs text-gray-400 mt-1">Score: --</div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="text-gray-400 text-xs mb-1">1H Key Indicators</div>
+                    <div id="engIndSummary" class="text-xs text-gray-300 mt-1">RSI: -- · ATR%: -- · ADX: --</div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-card rounded-2xl p-5 border border-gray-800 space-y-3">
+                    <h3 class="text-base font-bold text-white">Strategy Monitor (Regime Eligibility)</h3>
+                    <div id="engStrategies" class="space-y-2 text-xs text-gray-300">Loading...</div>
+                </div>
+                <div class="glass-card rounded-2xl p-5 border border-gray-800 space-y-3">
+                    <h3 class="text-base font-bold text-white">Latest Signal Analysis &amp; Score</h3>
+                    <pre id="engSignalExplanation" class="text-xs text-gray-300 whitespace-pre-wrap bg-gray-900/70 p-3 rounded-lg border border-gray-800">Loading...</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Risk Monitor & Kill Switch (Section 18G) -->
+        <div id="tab-risk" class="hidden space-y-6">
+            <div class="glass-card rounded-2xl p-6 border border-gray-800 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Independent Risk Management Engine</h3>
+                        <p class="text-xs text-gray-400">Spot-only · Leverage Disabled · Cost-adjusted ATR position sizing</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleKillSwitch(true)" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white rounded-lg">Activate Kill Switch</button>
+                        <button onclick="toggleKillSwitch(false)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg">Clear Kill Switch</button>
+                    </div>
+                </div>
+                <div id="engRiskGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">Loading...</div>
+                <div id="engRiskLockouts" class="text-xs text-amber-300"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Backtesting Dashboard (Section 18F) -->
+        <div id="tab-backtest" class="hidden space-y-6">
+            <div class="glass-card rounded-2xl p-6 border border-gray-800 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Historical Backtesting &amp; Benchmark Comparison</h3>
+                        <p class="text-xs text-gray-400">Zero-lookahead 1D/4H/1H simulation with realistic fees &amp; slippage</p>
+                    </div>
+                    <button onclick="runEngineBacktest()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-sm font-medium text-white rounded-lg">Run BTC Backtest</button>
+                </div>
+                <div id="engBacktestStatus" class="text-xs text-gray-400"></div>
+                <div id="engBacktestResults" class="space-y-4 text-xs text-gray-300">No backtests loaded yet.</div>
+            </div>
+        </div>
+
+        <!-- Tab 5: ML Monitor & Attribution (Sections 15 & 18H) -->
+        <div id="tab-ml" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-card rounded-2xl p-5 border border-gray-800 space-y-3">
+                    <h3 class="text-base font-bold text-white">ML Signal Quality Filter Status</h3>
+                    <div id="engMlStatus" class="text-xs text-gray-300">Checking ML model registry...</div>
+                </div>
+                <div class="glass-card rounded-2xl p-5 border border-gray-800 space-y-3">
+                    <h3 class="text-base font-bold text-white">Performance Attribution (By Strategy &amp; Regime)</h3>
+                    <div id="engAttribution" class="text-xs text-gray-300">Loading attribution...</div>
+                </div>
             </div>
         </div>
 
@@ -691,6 +787,108 @@ def index_page():
             } catch (e) {
                 alert("Failed to save snapshot.");
             }
+        }
+
+        function switchTab(tabName) {
+            ['fleet', 'market', 'risk', 'backtest', 'ml'].forEach(t => {
+                document.getElementById('tab-' + t).classList.toggle('hidden', t !== tabName);
+                const btn = document.getElementById('btn-tab-' + t);
+                btn.className = t === tabName
+                    ? 'tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white'
+                    : 'tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700';
+            });
+            if (tabName === 'market') loadMarketAndSignals();
+            if (tabName === 'risk') loadRiskStatus();
+            if (tabName === 'backtest') loadBacktestHistory();
+            if (tabName === 'ml') loadMlAndAttribution();
+        }
+
+        async function loadMarketAndSignals() {
+            try {
+                const [mRes, sRes] = await Promise.all([
+                    fetch('/api/engine/market-overview').then(r => r.json()),
+                    fetch('/api/engine/signals').then(r => r.json())
+                ]);
+                document.getElementById('engPrice').innerText = `$${Number(mRes.price).toLocaleString()}`;
+                document.getElementById('engChange24h').innerText = `24h: ${mRes.change_24h_pct >= 0 ? '+' : ''}${mRes.change_24h_pct}%`;
+                document.getElementById('engRegime').innerText = mRes.regime.regime;
+                document.getElementById('engRegimeConf').innerText = `Confidence: ${mRes.regime.confidence_score}%`;
+                document.getElementById('engMtfBias').innerText = `${mRes.mtf.daily_bias} / ${mRes.mtf.h4_bias} / ${mRes.mtf.h1_bias}`;
+                document.getElementById('engMtfScore').innerText = `Alignment: ${mRes.mtf.alignment_score}/100 (${mRes.mtf.decision})`;
+                const ind = mRes.indicators_1h;
+                document.getElementById('engIndSummary').innerText = `RSI: ${ind.rsi_14} · ATR%: ${ind.atr_pct}% · ADX: ${ind.adx_14} · Vol: ${ind.relative_volume}x`;
+                document.getElementById('engStrategies').innerHTML = sRes.strategies.map(s =>
+                    `<div class="flex justify-between p-2 rounded bg-gray-900/60 border border-gray-800">
+                        <span><strong>${s.name}</strong> (${s.type})</span>
+                        <span class="${s.eligible ? 'text-emerald-400' : 'text-gray-500'}">${s.enabled ? (s.eligible ? 'ELIGIBLE' : 'STANDBY') : 'DISABLED'}</span>
+                    </div>`
+                ).join('');
+                document.getElementById('engSignalExplanation').innerText = sRes.current.explanation || 'No explanation';
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadRiskStatus() {
+            try {
+                const r = await fetch('/api/engine/risk').then(res => res.json());
+                document.getElementById('engRiskGrid').innerHTML = `
+                    <div class="p-3 rounded bg-gray-900/70 border border-gray-800"><div class="text-xs text-gray-400">Risk / Trade</div><div class="font-bold text-white">${r.risk_per_trade_pct}%</div></div>
+                    <div class="p-3 rounded bg-gray-900/70 border border-gray-800"><div class="text-xs text-gray-400">Daily P&L</div><div class="font-bold text-white">$${r.daily_pnl} (${r.daily_pnl_pct}%)</div></div>
+                    <div class="p-3 rounded bg-gray-900/70 border border-gray-800"><div class="text-xs text-gray-400">Drawdown / Limit</div><div class="font-bold text-white">${r.current_drawdown_pct}% / ${r.max_drawdown_limit_pct}%</div></div>
+                    <div class="p-3 rounded bg-gray-900/70 border border-gray-800"><div class="text-xs text-gray-400">Kill Switch</div><div class="font-bold ${r.manual_kill_switch ? 'text-rose-400' : 'text-emerald-400'}">${r.manual_kill_switch ? 'ACTIVE' : 'OFF'}</div></div>
+                `;
+                document.getElementById('engRiskLockouts').innerText = r.active_lockouts.length ? `Active Lockouts: ${r.active_lockouts.join(' | ')}` : 'All risk checks healthy. No active lockouts.';
+            } catch (e) { console.error(e); }
+        }
+
+        async function toggleKillSwitch(active) {
+            await fetch('/api/engine/risk/kill-switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active, reason: 'Dashboard operator action' })
+            });
+            loadRiskStatus();
+        }
+
+        async function runEngineBacktest() {
+            document.getElementById('engBacktestStatus').innerText = 'Starting background backtest...';
+            const res = await fetch('/api/engine/backtest/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).then(r => r.json());
+            document.getElementById('engBacktestStatus').innerText = `Job ${res.run_id} queued. Refreshing shortly...`;
+            setTimeout(loadBacktestHistory, 4000);
+        }
+
+        async function loadBacktestHistory() {
+            try {
+                const data = await fetch('/api/engine/backtest/history').then(r => r.json());
+                const runs = data.runs || [];
+                if (!runs.length) {
+                    document.getElementById('engBacktestResults').innerText = 'No backtest runs stored yet. Click "Run BTC Backtest" to start.';
+                    return;
+                }
+                document.getElementById('engBacktestResults').innerHTML = runs.map(run => {
+                    const m = run.metrics;
+                    return `<div class="p-4 rounded-xl bg-gray-900/70 border border-gray-800 space-y-2">
+                        <div class="flex justify-between font-bold text-white"><span>${run.run_id} (${run.strategy_name})</span><span>Return: ${m.total_return_pct}% | Buy&amp;Hold: ${run.benchmarks.btc_buy_hold_pct}%</span></div>
+                        <div class="text-gray-400">Trades: ${m.total_trades} · Win Rate: ${m.win_rate_pct}% · PF: ${m.profit_factor} · Max DD: ${m.max_drawdown_pct}% · Sharpe: ${m.sharpe_ratio} · Sortino: ${m.sortino_ratio} · Expectancy: $${m.expectancy}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadMlAndAttribution() {
+            try {
+                const [ml, attr] = await Promise.all([
+                    fetch('/api/engine/ml-status').then(r => r.json()),
+                    fetch('/api/engine/attribution').then(r => r.json())
+                ]);
+                document.getElementById('engMlStatus').innerText = ml.implemented
+                    ? `Active Model: ${ml.active_model.version} (${ml.active_model.model_type}) · Trained: ${ml.active_model.trained_at_utc} · Precision: ${ml.active_model.precision_score} · Brier: ${ml.active_model.brier_score}`
+                    : 'ML Signal Filter not yet trained.';
+                document.getElementById('engAttribution').innerText = `Closed Trades: ${attr.total_closed_trades}\nBy Strategy: ${JSON.stringify(attr.by_strategy)}\nBy Regime: ${JSON.stringify(attr.by_regime)}`;
+            } catch (e) { console.error(e); }
         }
 
         fetchFleetData();
