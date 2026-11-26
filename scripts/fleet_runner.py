@@ -1,8 +1,13 @@
 import os
 import sys
 
-# Ensure scripts directory is on python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure project root and scripts directory are on python path
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_ROOT_DIR = os.path.dirname(_SCRIPTS_DIR)
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 import time
 import subprocess
